@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Document</title>
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.10.16/css/jquery.dataTables.min.css"/>
+  <style>
+    div#table1_wrapper {
+      /* overflow: auto; */
+      /* height: 900px; */
+      font-family: Microsoft JhengHei, Arial, Helvetica, sans-serif;
+    }
+    select#selectType {
+      position: absolute;
+      left: 20%;
+      z-index: 5;
+    }
+    table#table1 {
+      z-index: 6;
+      position: relative;
+    }
+    #table1 td:nth-child(9) {
+      position: relative;
+    }
+    /* .copyLink:hover::before, .copyLink:hover::after {
+      display: inline-block;
+    } */
+    .copyLink.show::before, .copyLink.show::after {
+      display: block;
+    }
+    .copyLink::before {
+      display: none;
+      content: "已複製";
+      z-index: 5;
+      position: absolute;
+      top: 91%;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      color: white;
+      word-wrap: break-word;
+      white-space: pre;
+      pointer-events: none;
+      padding: 8px 10px;
+      font-size: 12px;
+      background: rgba(0,0,0,0.75);
+      border-radius: 3px;
+    }
+    .copyLink::after {
+      display: none;
+      position: absolute;
+      content: "";
+      z-index: 5;
+      bottom: 8%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      pointer-events: none;
+      border-bottom: solid 7px rgba(0,0,0,0.75);
+      border-right: solid 7px transparent;
+      border-left: solid 7px transparent;
+    }
+
+    
+  </style>
+</head>
+<body>
+  <!-- <input id="example" value="Hello World">
+    
+      屬性設定[註1] 
+     data-clipboard-target: 目標物件，將會複製物件的內容
+    
+  <button id="copy" data-clipboard-target="">複製</button> -->
+
+  <select id="selectType">
+    <option value="" disabled selected>-----</option>
+    <option value="">全部</option>
+    <option value="土基會">土基會</option>
+    <option value="督察總隊">督察總隊</option>
+    <option value="廢管處">廢管處</option>
+    <option value="空保處">空保處</option>
+    <option value="監資處">監資處</option>
+    <option value="環管處">環管處</option>
+    <option value="化學局">化學局</option>
+  </select>
+  <table id="table1" class="display" style="width:100%"></table>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/1.7.1/clipboard.min.js"></script>
+  <!--引用jQuery-->
+	<script type="text/javascript" src="https://code.jquery.com/jquery-3.3.1.js"></script>
+	<!--引用dataTables.js-->
+	<script type="text/javascript" src="https://cdn.datatables.net/1.10.16/js/jquery.dataTables.min.js"></script>
+  <script type="text/javascript">
+    // 引用點擊複製功能
+    new Clipboard( ".copyLink" );
+
+    // 如果是true資料會顯示，如果false則不會
+    var fillterBySelect = function(column, value) {
+			$.fn.dataTableExt.afnFiltering.length = 0;
+			$.fn.dataTableExt.afnFiltering.push(
+				function(oSettings, aData, iDataIndex) {
+          if(value === '') {
+            return true;
+          };
+					if(aData[column] === value) {
+						return true;
+					}else {
+						return false;
+					};
+				}
+			);
+		};
+
+    $(document).ready(function () {
+      $.ajax({
+        type: "POST",
+        url: "https://geoser.epa.gov.tw/advserver/rest/services/Hosted/%E7%92%B0%E4%BF%9D%E7%BD%B2%E5%B9%B3%E5%8F%B0%E4%B8%8A%E6%9E%B6%E5%9C%96%E8%B3%87%E6%B8%85%E5%96%AE/FeatureServer/0/query?where=1%3D1&outFields=*&f=pjson",
+        dataType: "json",
+        success: function(resultData) {
+          // 存放資料
+          var tableTitle = resultData.fields;
+          var tabledata = resultData.features;
+          var dataTitleAry = [];
+          var dataTitleobj = {};
+
+          // 過濾及篩檢表格標題顯示資料
+          for(var i = 0; i < tableTitle.length; i++) {
+            var dataTitleType = tableTitle[i].name;
+            if(dataTitleType === 'objectid') continue;
+            dataTitleobj.sTitle = dataTitleType;
+            dataTitleobj.mData = dataTitleType;
+            dataTitleAry.push(dataTitleobj);
+            dataTitleobj = {};
+          };
+          // 存放內容顯示資料
+          var dataAry = [];
+          var dataObj = {};
+
+          // 過濾及篩檢表格內容顯示資料
+          for(var z = 0; z < tabledata.length; z++) {
+            var timeType = tabledata[z].attributes['資料最新時間'];
+            if(timeType) {
+              // 轉換日期格式
+              var getDate = new Date(timeType);
+              var getDateYear = getDate.getFullYear();
+              var getDateMonth = getDate.getMonth();
+              var getDateDay = getDate.getDay();
+              var dateStr = getDateYear + '/' + getDateMonth + '/' + getDateDay;
+              tabledata[z].attributes['資料最新時間'] = dateStr;
+            };
+            dataObj = tabledata[z].attributes;
+            dataAry.push(dataObj);
+          };
+
+          dataAry.filter(function(item) {
+            // 去掉不要的屬性
+            if(item.hasOwnProperty('objectid')) {
+              delete item.objectid;
+            };
+          });
+
+          // datatables格式
+          var opt = {
+            "lengthMenu": [10],
+            // 初始化完畢後載入
+            // 如果要等表格載入完再執行就寫在裡面
+            "initComplete": function(settings, json) {
+              $('.copyLink').click(function() {
+                var _this = $(this);
+                _this.addClass('show');
+                setTimeout(function() {
+                  _this.removeClass('show');
+                }, 2000);
+              });
+            },
+            "oLanguage": {"sUrl":"dataTables.zh-tw.txt"},
+            "bJQueryUI": true,
+            "deferRender": true,
+            "processing": true, // 加載提示
+            // 標題顯示
+            "aoColumns": dataTitleAry,
+            // 資料顯示
+            "aaData": dataAry,
+            "aoColumnDefs": [
+              {
+                // 選取第九個aoColumns項目
+                "aTargets": [8],
+                // 將連結網址置換成a連結標籤
+                "mRender": function (data, type, row) {
+                  return `<a href="#" class="copyLink" data-clipboard-text="${data}">複製連結</a>`;
+                },
+              }, 
+            ],
+          };         
+          var $table = $("#table1").dataTable(opt);
+
+          var select = $('#selectType');
+          var value;
+          $('#selectType').on('change', function() {
+            value = $(this).val();
+            // 用資料索引匹配值
+            fillterBySelect(3, value);
+            $table.dataTable().fnDraw();
+          });
+
+        },
+        error: function(err) {
+          console.error(err);
+        }
+      });
+    });
+  </script>
+</body>
+</html>
